@@ -1,6 +1,8 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "name": "sicinfo-myutils",
   "dependencies": {
+    "joi": "^14.x",
+    "arangojs": "^6.x"
   }
 }
