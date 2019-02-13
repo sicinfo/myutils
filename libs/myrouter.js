@@ -56,7 +56,9 @@ myclass = (_routes, options) => class {
   }
   
   do_() {
-
+    
+    if (!this.service) return this.status(404).send();
+    
     const { hostname, body, query, key, rev } = this;
     
     this.service.do_(this.method, { hostname, key, rev, body, query })
