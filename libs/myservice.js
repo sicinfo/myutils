@@ -53,7 +53,7 @@ Service = module.exports = class {
     accept({});
   }
   
-  do_post(accept, reject) {
+  do_post(accept, reject, { body }) {
     accept({});
   }
 
