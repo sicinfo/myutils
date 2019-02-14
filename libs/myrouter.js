@@ -61,7 +61,7 @@ myclass = (_routes, options) => class {
     
     const { hostname, body, query, key, rev } = this;
     
-    this.service.do_(this.method, { hostname, key, rev, body, query })
+    this.service.do_(this.method, this)
 
     .then(({ code, data, headers = [] }) => {
       if (headers.length) headers.forEach(header => this.setHeader(...header));
