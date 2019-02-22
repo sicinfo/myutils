@@ -5,91 +5,99 @@
  * 
  */
 'use strict';
-const { log, warn } = console;
-log('loading...', __filename);
 
-const 
-{ join } = require('path'),   
-{ readdirSync } = require('fs'),   
-Url = require('url'),
-symb = Symbol(),
+console.log('loading...', __filename);
 
-myclass = (_routes, options) => class {
+const symb = Symbol(),
+  
+Myrouter = module.exports = class {
 
-  constructor(req, res) {
-    const _url = req.url.split('/');
+  constructor(req, res, options) {
+    this[symb] = { req, res, options };
     
-    this[symb] = {
-      'req': req,
-      'res': res,
-      'method': req.method,
-      'headers': req.headers,
-      'originalUrl': req.originalUrl,
-      'url': _url.slice(0, 2).join('/'),
-      'key': _url[2],
-      'rev': _url[3]
-    };
-
-    if ('GET' === req.method) {
-      this[symb].query = Url.parse(req.url, true).query;
-      this[symb].body = {};
-    }
-      
+    if (this.isGetMethod) Myrouter.do_.call(this, req, res);
     else {
-      this[symb].query = {};
-      this[symb].body = (async() => await new Promise((accept, reject) => {
-        
-        let body = {};
-
-        req.on('data', chunk => {
-          body = JSON.parse(chunk);
-        });
-
-        req.on('end', () => {
-          accept(body);
-        });
-
-      }))();
+      req.on('data', chunk => { this[symb].body = JSON.parse(chunk) });
+      req.on('end', () => { Myrouter.do_.call(this, req, res) });
     }
-
-    this.do_();
   }
   
-  do_() {
-    
-    if (!this.service) return this.status(404).send();
-    
-    const { hostname, body, query, key, rev } = this;
-    
-    this.service.do_(this.method, this)
+  static do_(req, res) {
 
+    const { service } = this;
+    if (!service) {
+      const { join } = require('path'), { originalUrl, url } = this;
+      return this.status(404).json({ 'mesage': `${join(originalUrl.split(url)[0], url)} - not found!` });
+    }
+    
+    new service(this[symb].options).do_()
+    // .then(Myauth.validade)
     .then(({ code, data, headers = [] }) => {
       if (headers.length) headers.forEach(header => this.setHeader(...header));
       this.status(code).json({ data });
     })
-
     // .catch(MyAuth.renew)
-
-    .catch(({ code, message }) => {
-      warn(code, message);
-      this.status(code).json({ 'error': message });
+    .catch(({ code = 500, message }) => {
+      console.warn(code, message);
+      this.status(code).json({ message });
     });
-
   }
     
-  get query() {
-    return this[symb].query || {};
+  get dirname() {
+    return this[symb].options.dirname;
   }
   
+  // segundo nível
+  get service() {
+    
+    const _this = this, { url } = _this;
+    if ('/' === url) return;
+    
+    const services = _this[symb].options[symb] || (_this[symb].options[symb] = {});
+    if (!(url in services)) {
+      const filename = require('path').join(_this.dirname, _this.dirservices, `${url.slice(1)}-service.js`);
+      
+      if (!require('fs').existsSync(filename)) return;
+      
+      services[url] = class extends require(filename) {
+        get originalUrl() { return _this.originalUrl }
+        get method() { return _this.method }
+        get key() { return _this.key }
+        get rev() { return _this.rev }
+        get query() { return _this.query }
+        get body() { return _this.body }
+      };
+    }
+    
+    return services[url];
+  }
+  
+  get query() {
+    if (!this.has('query')) 
+      this[symb].query = this.isGetMethod ? require('url').parse(this.originalUrl, true).query : {};
+
+    return this[symb].query;
+  }
+    
   get body() {
     return this[symb].body || {};
   }
   
   get method() {
+    if (!this.has('method'))
+      this[symb].method = this[symb].req.method;
+
     return this[symb].method;
   }
   
+  get isGetMethod() {
+    return 'GET' === this.method;
+  }
+  
   get headers() {
+    if (!this.has('headers'))
+      this[symb].headers = this[symb].req.headers;
+
     return this[symb].headers;
   }
   
@@ -98,36 +106,43 @@ myclass = (_routes, options) => class {
   }
   
   get key() {
+    if (!this.has('key'))
+      this[symb].key = this[symb].req.url.split('/')[2];
+
     return this[symb].key;
   }
   
   get rev() {
+    if (!this.has('rev'))
+      this[symb].rev = this[symb].req.url.split('/')[3];
+
     return this[symb].rev;
   }
   
   get url() {
+    if (!this.has('url'))
+      this[symb].url = this[symb].req.url.split('/').slice(0, 2).join('/');
+
     return this[symb].url;
   }
   
   get originalUrl() {
+    if (!this.has('originalUrl'))
+      this[symb].originalUrl = this[symb].req.originalUrl;
+
     return this[symb].originalUrl;
   }
   
-  // segundo nível
-  get service() {
-    const { url } = this; 
-    
-    log(118, 'segundo nível - url', url);
-    log(118, 'segundo nível - options', options);
-
-    if ('string' === typeof _routes[url])
-      _routes[url] = new (require(_routes[url]))(options);
-      
-    return _routes[url];
+  get dirservices() {
+    return 'services';
   }
-    
+  
+  has(arg) { 
+    return arg in this[symb];
+  }
+  
   setHeader(key, val) {
-    this[symb].res.setHeader(key, val);
+    this.headers.setHeader(key, val);
     return this;
   }
   
@@ -137,39 +152,13 @@ myclass = (_routes, options) => class {
   }
   
   json(data) {
-    const { res } = this[symb];
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify(data), 'utf8');
+    this[symb].res.setHeader('content-type', 'application/json');
+    this[symb].res.end(JSON.stringify(data), 'utf8');
   }
   
   send(args) {
-    const { res } = this[symb];
-    res.setHeader('content-type', 'text/plain');
-    res.end(args || '', 'utf8');
+    this[symb].res.setHeader('content-type', 'text/plain');
+    this[symb].res.end(args || '', 'utf8');
   }
   
 };
-
-module.exports = (
-  options,
-  _dirname,
-  _routes = {}, 
-  SERVICE_DIR = 'services', 
-  SERVICE_JS = 'service.js'
-) => {
-  _dirname = join(_dirname, SERVICE_DIR);
-  
-  // segundo nível de micro serviço
-  // micro serviço da aplicação
-  readdirSync(_dirname)
-  .filter(_filename => _filename.endsWith(SERVICE_JS))
-  .forEach(_filename => { 
-    _routes[`/${_filename.split('-')[0].toLowerCase()}`] = join(_dirname, _filename);
-  });
-  
-  const { defaultDb } = options;
-
-  return myclass(_routes, { defaultDb, 'options': options[defaultDb] });
-    
-};
-  

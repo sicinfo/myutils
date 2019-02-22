@@ -1,78 +1,100 @@
- /**
+/**
+ * application: myutils 
+ *
  * powered by Moreira in 2019-02-13
  */
 'use strict';
 
 console.log('loading...', __filename);
 
-const 
-{ assign } = Object,
-symb = Symbol(),
+const symb = Symbol();
+module.exports = class {
 
-Service = module.exports = class {
-  
-  constructor(args) {
-    this[symb] = assign({}, args);
+  constructor(options = {}) {
+    this[symb] = { options };
+
+    /*    
+        // .then((arg = {}) => {
+        //   const { error, code } = arg;
+        //   if (error) return { 'code': code || 409, error };
+                
+        //   let { data } = arg;
+        //   const { _key, _rev } = arg;
+        //   if (_key && _rev) data = (obj => (obj[`${_key}/${_rev}`] = {}, obj))({});
+        //   if (data) data = { data, 'code': code || 200 };
+        //   else data = { 'code': 204 };
+                
+        //   data.headers = arg.headers;
+        //   return data;
+        // })
+        
+        // .catch(({ code = 500, message}) => {
+        //   return {code, message};
+        // });
+    */
   }
   
-  do_(method, options) {
-    
-    const _token = options.token;
+  // get options() {
+  //   return this[symb].options;
+  // }
+
+  do_() {
     
     return new Promise((accept, reject) => {
-      this[`do_${method.toLowerCase()}`](accept, reject, options);
+      this[`do_${this.method.toLowerCase()}`](accept, reject, this[symb].options);
     })
     .then((arg = {}) => {
-      let { code, error, data, headers, token = _token, _key, _rev } = arg;
-      
-      if (_key && _rev) {
-        data = (obj => (obj[`${_key}/${_rev}`] = {}, obj))({});
-      }
 
-      if (error) return { 
-        token, 
-        'code': code || 409, 
-        error 
-      };
-      
-      else if (data) return { 
-        token, 
-        'code': code || 200,  
-        data, 
-        headers
-      };
-      
-      else return { 
-        token, 
-        'code': 204,
-        headers
-      };
-      
+      const { error, code } = arg;
+      if (error) return { code, error };
+
+      let { data } = arg;
+      const { _key, _rev } = arg;
+      if (_key && _rev) data = (obj => (obj[`${_key}/${_rev}`] = {}, obj))({});
+      if (data) data = { data, 'code': code || 200 };
+      else data = { 'code': 204 };
+
+      data.headers = arg.headers;
+      return data;
     })
-    .catch((arg = {}) => {
+    .catch(err => {
       
-      const 
-      { isArangoError, isJoi } = arg,
-      resp = { 'token': arg.token || _token };
-            
-      isArangoError ? assign(resp, {
-        'code': arg.response.body.code,
-        'message': arg.response.body.errorMessage
-      }) :
+console.warn(33, __filename, 'code', err.code);
+console.warn(34, __filename, 'message', err.message);
+console.warn(35, __filename, 'error', err.error);
       
-      isJoi ? assign(resp, {
-        'code': 412,
-        'message': arg.details.map(obj => obj.message)
-      }) : 
-      
-      assign(resp, {
-        'code': arg.code || 500,
-        'message': arg.message
-      });
-      
-      return resp;
+      return err;
     });
+    
   }
 
+  do_get(...args) {
+    if (this.key) this.do_getByKey(...args);
+    else this.do_getByQuery(...args);
+  }
+  
+  do_getByKey(accept) {
+    accept({});
+  }
+
+  do_getByQuery(accept) {
+    accept({});
+  }
+
+  do_post(accept) {
+    accept({});
+  }
+
+  do_put(accept) {
+    accept({});
+  }
+
+  do_patch(accept) {
+    accept({});
+  }
+
+  do_delete(accept) {
+    accept({});
+  }
   
 };
