@@ -23,8 +23,10 @@ Service = module.exports = class {
   // args.db
   // args.databaseName
   constructor(args) {
-    
-    this[symb] = assign({}, args);
+
+    this[symb] = {
+      'databaseName': args && args.arangodb && args.arangodb.databaseName
+    };
     
     const { db } = this;
     
@@ -129,13 +131,14 @@ Service = module.exports = class {
     else this.do_getByQuery(accept, reject, options);
   }
   
-  do_getByKey(res, rej, {key}) {
+  do_getByKey(accept, reject, { key }) {
     this.collection.document(key)
-      .then(arg => { res({ 'data': Service._parseData(arg) });
+    .then(arg => {
+      accept({ 'data': Service._parseData(arg) });
     })
-    .catch(rej);
+    .catch(reject);
   }
-  
+    
   do_getByQuery(res, rej, { query }) {
 
     const _filter = q => (a => a ? ` FILTER ${a}` : '')(
@@ -221,10 +224,14 @@ Service = module.exports = class {
   }
 
   // list colections to create
-  get collectionDefinitions() { return [] }
+  get collectionDefinitions() { 
+    return [];
+  }
   
   //
-  get requiredAuthorization() { return false }
+  get requiredAuthorization() { 
+    return false;
+  }
     
   // implementar
   get schema() {}
