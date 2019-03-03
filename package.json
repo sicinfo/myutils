@@ -1,7 +1,6 @@
 {
   "version": "0.2.0",
   "name": "sicinfo-myutils",
-  "main": "myutils.js",
   "dependencies": {
     "joi": "^14.x",
     "arangojs": "^6.x"

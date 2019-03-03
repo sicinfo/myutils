@@ -1,14 +1,16 @@
 /**
  * application: myrouter
  * 
- * powered by Moreira in 2019-02-08
- * 
+db * 
  */
 'use strict';
 
 console.log('loading...', __filename);
 
-const symb = Symbol(),
+const 
+  log = (a, ...b) => console.log(a, `${__filename}\n`, ...b),
+  Myauth = require('./myauth'),
+  symb = Symbol(),
   
 Myrouter = module.exports = class {
 
@@ -23,24 +25,50 @@ Myrouter = module.exports = class {
   }
   
   static do_(req, res) {
-
+    
     const { service } = this;
     if (!service) {
       const { join } = require('path'), { originalUrl, url } = this;
       return this.status(404).json({ 'mesage': `${join(originalUrl.split(url)[0], url)} - not found!` });
     }
     
-    new service(this[symb].options).do_()
-    // .then(Myauth.validade)
-    .then(({ code, data, headers = [] }) => {
-      if (headers.length) headers.forEach(header => this.setHeader(...header));
-      this.status(code).json({ data });
-    })
-    // .catch(MyAuth.renew)
-    .catch(({ code = 500, message }) => {
-      console.warn(code, message);
-      this.status(code).json({ message });
-    });
+    const { authorization, originalUrl, method, key, rev, query, body } = this;
+    
+    (service => {
+      
+      Myauth.validate(this.authorization, service.requiredAuthorization)
+        .then(({ token }) => {
+          
+// log(41, token);
+          
+          service.do_()
+            .then(({ code, result, headers = [] }) => {
+              
+// log(47, code, result, headers)              ;
+
+              if (token) headers.push(Myauth.renew(token));
+              if (headers.length) headers.forEach(header => this.setHeader(...header));
+              
+// log(51, this[symb].res.getHeader('authorization'));              
+              
+// log(53, this[symb].res.headers);              
+
+              if (result) this.status(code).json({ result });
+              else this.status(code).send();
+
+            })
+            .catch(({ code = 500, message }) => {
+              console.warn(code, message);
+              return {code, message};
+            });
+            
+        })
+        .catch(({ code, message }) => { 
+          this.status(code).json({ message });
+        });
+
+    })(new service(Object.assign({ authorization, originalUrl, method, key, rev, query, body }, this[symb].options)));
+    
   }
     
   get dirname() {
@@ -50,7 +78,7 @@ Myrouter = module.exports = class {
   // segundo nível
   get service() {
     
-    const _this = this, { url } = _this;
+    const _this = this, url = _this.url.split('?')[0];
     if ('/' === url) return;
     
     const services = _this[symb].options[symb] || (_this[symb].options[symb] = {});
@@ -59,20 +87,14 @@ Myrouter = module.exports = class {
       
       if (!require('fs').existsSync(filename)) return;
       
-      services[url] = class extends require(filename) {
-        get originalUrl() { return _this.originalUrl }
-        get method() { return _this.method }
-        get key() { return _this.key }
-        get rev() { return _this.rev }
-        get query() { return _this.query }
-        get body() { return _this.body }
-      };
+      services[url] = require(filename);
     }
     
     return services[url];
   }
   
   get query() {
+
     if (!this.has('query')) 
       this[symb].query = this.isGetMethod ? require('url').parse(this.originalUrl, true).query : {};
 
@@ -95,10 +117,17 @@ Myrouter = module.exports = class {
   }
   
   get headers() {
-    if (!this.has('headers'))
+    if (!('headers' in this[symb]))
       this[symb].headers = this[symb].req.headers;
 
     return this[symb].headers;
+  }
+  
+  get authorization() {
+    if (!('authorization' in this[symb])) 
+      this[symb].authorization = this.headers.authorization || '';
+    
+    return this[symb].authorization;
   }
   
   get hostname() {
@@ -142,7 +171,10 @@ Myrouter = module.exports = class {
   }
   
   setHeader(key, val) {
-    this.headers.setHeader(key, val);
+    this[symb].res.setHeader(key, val);
+    
+// log(173, key, val, this[symb].res.getHeader(key));
+
     return this;
   }
   

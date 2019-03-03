@@ -160,22 +160,22 @@ Service = module.exports = class extends require('./myservice') {
 
   do_get(accept, reject, options) {
     
-    new Promise((_accept, _reject) => {
-      super.do_get(_accept, _reject, options);
+    new Promise((...args) => {
+      super.do_get(...args.concat(options));
     })
-    .then(data => {
+    .then(result => {
       
-      if (this.isEdge) keys(data.data).filter(doc => {
-        keys(data.data[doc]) 
+      if (this.isEdge) keys(result.result).filter(doc => {
+        keys(result.result[doc]) 
           .filter(key => ['_from', '_to'].includes(key))
-          .map(key => [key].concat(data.data[doc][key].split('/')))
+          .map(key => [key].concat(result.result[doc][key].split('/')))
           .filter(([key, _key, _val]) => {
-            data.data[doc][_key] = _val;
-            delete data.data[doc][key];
+            result.result[doc][_key] = _val;
+            delete result.result[doc][key];
           });
       });
 
-      accept(data);
+      accept(result);
     })
     .catch(reject);
   }
@@ -183,13 +183,12 @@ Service = module.exports = class extends require('./myservice') {
   do_getByKey(accept, reject) {
     this.collection.document(this.key)
     .then(arg => {
-      accept({ 'data': Service._parseData(arg) });
+      accept({ 'result': Service._parseData(arg) });
     })
     .catch(reject);
   }
     
   do_getByQuery(accept, reject) {
-
     const 
       _filter = q => (a => a ? ` FILTER ${a}` : '')(
         keys(q)
@@ -201,10 +200,13 @@ Service = module.exports = class extends require('./myservice') {
       
       { db, collectionName, query } = this;
     
-    // log(`FOR d IN ${collectionName}${_filter(query)} RETURN d`);
+    console.log(`FOR d IN ${collectionName}${_filter(query)} RETURN d`);
     db.query(`FOR d IN ${collectionName}${_filter(query)} RETURN d`)
     .then(({ count, _result }) => {
-      accept({ 'count': count || _result.length, 'data': Service._parseData(_result) });
+      accept({ 
+        'count': count || _result.length, 
+        'result': Service._parseData(_result) 
+      });
     })
     .catch(reject);
   }
@@ -328,6 +330,13 @@ Service = module.exports = class extends require('./myservice') {
 
   // list colections to create
   get collectionDefinitions() { 
+    `example:
+      [
+        {
+          'indexes': { 'fields': 'fornecedor', 'unique': true }
+        }
+      ]
+    `;
     return [];
   }
   
@@ -340,17 +349,31 @@ Service = module.exports = class extends require('./myservice') {
   get schema() {}
   
   get collectionName() {
-    return this.originalUrl.split('/')[3];
+
+    if (!('collectionName' in this[symb]))
+      this[symb].collectionName = this.originalUrl.split('?')[0].split('/')[3];
+
+    return this[symb].collectionName;
   }
   
-  get databaseName() {
+  get urlApps() {
     return this.originalUrl.split('/')[2];
   }
   
-  get basicAuth() {
+  get databaseName() {
     
+    if (!('databaseName' in this[symb])) {
+      const { dbconfig } = this, { databaseName } = dbconfig;
+      this[symb].databaseName = databaseName || this.urlApps;
+    }
+
+    return this[symb].databaseName;
+  }
+  
+  get basicAuth() {
+
     if (!('basicAuth' in this[symb])) {
-      const { username, passwd } = this.dbconfig;
+      const { username = '', passwd = ''} = this.dbconfig;
       this[symb].basicAuth = [username, passwd];
     }
     
@@ -358,11 +381,15 @@ Service = module.exports = class extends require('./myservice') {
   }
 
   get dbconfig() {
-
+    
     if (!('dbconfig' in this[symb])) {
-      const { readFileSync, existsSync } = require('fs'), { dbconfig } = this[symb].options;
+      let { dbconfig } = this[symb].options;
+      if (!(dbconfig.match(/^(\/|\.)/))) 
+        dbconfig = require('path').join(process.env.HOME, dbconfig);
+        
+      const { readFileSync, existsSync } = require('fs');
       this[symb].dbconfig = existsSync(dbconfig) && dbconfig.endsWith('.json') &&
-        JSON.parse(readFileSync(dbconfig)).arangodb[this.databaseName] ||  null;
+        JSON.parse(readFileSync(dbconfig)).arangodb[this.urlApps] ||  null;
     }
     
     return this[symb].dbconfig;

@@ -3,104 +3,58 @@
  */
 'use strict';
 
-const 
-{ log, warn } = console;
-log('loading...', __filename);
+const log = (a, ...b) => console.log(a, __filename, ...b);
+log('loading...');
 
 const
-{ assign } = Object,
-SECRET = process.env.username,
-BEARED = 'Beared',
-AUTHORIZATION = 'authorization',
-EXPIRESIN = 60 * 60, // 1 hora
-{ sign, verify } = require('jsonwebtoken'),
-
-MyAuth = module.exports = class {
-         
-  static sign({user}, options = {}) {
-    'expiresIn' in options || (options['expiresIn'] = EXPIRESIN);
-    return [AUTHORIZATION, `${BEARED} ${sign({ user }, SECRET, options)}`];
-  }
+  { assign } = Object,
+  SECRET = process.env.username,
+  BEARED = 'Beared',
+  AUTHORIZATION = 'authorization',
+  EXPIRESIN = 60 * 60, // 1 hora
+  { sign, verify } = require('jsonwebtoken'),
   
-  static create(user, pass, resp = {}) {
+  MyAuth = module.exports = class {
+           
+    static sign({user}, options = {}) {
+      'expiresIn' in options || (options['expiresIn'] = EXPIRESIN);
+      return [AUTHORIZATION, `${BEARED} ${sign({ user }, SECRET, options)}`];
+    }
     
-    return new Promise((res, rej) => {
+    static create(arg) {
+      return  MyAuth.sign(arg); 
+    }
       
-      if (pass !== resp.pass) rej({
-        'code': 401,
-        'error': {'message': 'unauthorized!'} 
-      });
-        
-      else res({
-        'data': { user, 'admin': resp.admin }, 
-        'headers': MyAuth.sign({ user }) 
-      });
-
-    });
-  }
-    
-  static check(authorization = '', requiredAuthorization)  {
-    
-    // log('check, authorization ', authorization);
-    
-    return new Promise((res, rej) => {
+    static validate(authorization, requiredAuthorization)  {
       
-      const [type, value] = authorization.split(' ');
+log(31, authorization);
+log(32, requiredAuthorization);
       
-      if (!type || type !== BEARED) {
+      return new Promise((accept, reject) => {
         
-        if (requiredAuthorization) rej({
-          'code': 401, 
-          'message': 'unauthorized!' 
-        });
+        const [type, value] = authorization.split(' ');
         
-        else res();
-      }
-      
-      else verify(value, SECRET, {}, (err, token) => {
+        if (!type || type !== BEARED) 
+          requiredAuthorization ? reject({'code': 401, 'message': 'Unauthorized'}) : accept({});
         
-        // log(62, 'check, error / token ', err, token);
-     
-        if (!err) res(token);
-        else if (!requiredAuthorization) res();
-        else rej({
-          'code': 401, 
-          'message': err.message 
-        });
-       
-      });
-            
-    });
-    
-  }
+        else verify(value, SECRET, {}, (err, token) => {
+          
+  log(43, token);  
   
-  static renew(args) {
+          if (err) requiredAuthorization ? reject({'code': 401, 'message': err.message}) : accept({});
+          else accept({ token });
+  
+        });
+              
+      });
+      
+    }
     
-    // log('renew, args', args);
-
-    return new Promise((res, rej) => {
-      
-      let { code, token, headers } = args;
-      delete args.token;
-      
-      if (token) {
-        if (!headers) headers = [];
-        headers.push(...MyAuth.sign(token));
-        assign(args, { headers });
-
-        // log('renew, token', token);
-      }
-            
-
-      // log('renew, code', +code);
-      if (+code < 400) res(args);
-      else rej(args);
-
-    });
-
-  }
-
-};
+    static renew(token) {
+      return MyAuth.sign(token);
+    }
+  
+  };
 
 
 

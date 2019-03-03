@@ -9,34 +9,10 @@ console.log('loading...', __filename);
 
 const symb = Symbol();
 module.exports = class {
-
+  
   constructor(options = {}) {
     this[symb] = { options };
-
-    /*    
-        // .then((arg = {}) => {
-        //   const { error, code } = arg;
-        //   if (error) return { 'code': code || 409, error };
-                
-        //   let { data } = arg;
-        //   const { _key, _rev } = arg;
-        //   if (_key && _rev) data = (obj => (obj[`${_key}/${_rev}`] = {}, obj))({});
-        //   if (data) data = { data, 'code': code || 200 };
-        //   else data = { 'code': 204 };
-                
-        //   data.headers = arg.headers;
-        //   return data;
-        // })
-        
-        // .catch(({ code = 500, message}) => {
-        //   return {code, message};
-        // });
-    */
   }
-  
-  // get options() {
-  //   return this[symb].options;
-  // }
 
   do_() {
     
@@ -48,14 +24,14 @@ module.exports = class {
       const { error, code } = arg;
       if (error) return { code, error };
 
-      let { data } = arg;
+      let { result } = arg;
       const { _key, _rev } = arg;
-      if (_key && _rev) data = (obj => (obj[`${_key}/${_rev}`] = {}, obj))({});
-      if (data) data = { data, 'code': code || 200 };
-      else data = { 'code': 204 };
+      if (_key && _rev) result = (obj => (obj[`${_key}/${_rev}`] = {}, obj))({});
+      if (result) result = { result, 'code': code || 200 };
+      else result = { 'code': 204 };
 
-      data.headers = arg.headers;
-      return data;
+      result.headers = arg.headers;
+      return result;
     })
     .catch(err => {
       
@@ -97,4 +73,38 @@ console.warn(35, __filename, 'error', err.error);
     accept({});
   }
   
+  get requiredAuthorization() {}
+  
+  get authorization() {
+    return this[symb].options.authorization;
+  }
+  
+  get isAuthorized() {
+    return !!this.authorization;
+  }
+  
+  get originalUrl() {
+    return this[symb].options.originalUrl;
+  }
+  
+  get method() {
+    return this[symb].options.method;
+  }
+  
+  get key() {
+    return this[symb].options.key;
+  }
+  
+  get rev() {
+    return this[symb].options.rev;
+  }
+  
+  get query() {
+    return this[symb].options.query;
+  }
+  
+  get body() {
+    return this[symb].options.body;
+  }
+
 };
